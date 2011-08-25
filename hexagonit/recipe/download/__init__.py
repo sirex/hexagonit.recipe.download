@@ -38,16 +38,35 @@ class Recipe(object):
         # buildout -vv (or more) will trigger verbose mode
         self.verbose = int(buildout['buildout'].get('verbosity', 0)) >= 20
         self.excludes = [x.strip() for x in options.get('excludes', '').strip().splitlines() if x.strip()]
+        self.renames = self._get_renames(options.get('rename', ''))
+
+    def _get_renames(self, lines):
+        renames = {}
+        for line in lines.strip().splitlines():
+            line = line.strip()
+            if line and ' ' in line:
+                src, dst = line.split(' ', 1)
+                renames[src] = dst
+        return renames
 
     def progress_filter(self, src, dst):
         """Filter out contents from the extracted package."""
         log = logging.getLogger(self.name)
+
         for exclude in self.excludes:
             if fnmatch(src, exclude):
                 if self.verbose:
                     log.debug("Excluding %s" % src.rstrip('/'))
                 self.excluded_count = self.excluded_count + 1
                 return
+
+        for old, new in self.renames.items():
+            if src.startswith(old):
+                dst = dst.replace(old, new)
+                if self.verbose:
+                    log.debug("Renaming %s to %s" % (src, dst))
+                return dst
+
         return dst
 
     def update(self):
